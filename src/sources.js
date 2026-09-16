@@ -61,20 +61,22 @@ async function isFile(path) {
 /**
  * The file that answers `path` inside `root`, or null.
  *
- * A path with an extension names a FILE, and a missing one is a 404 — answering
- * it with the HTML shell would hand a script tag an HTML document. Anything else
- * is a route: `<route>/index.html`, `<route>.html`, then the root `index.html`
- * (a route the client renders).
+ * The file itself, then a page: `<route>/index.html`, then `<route>.html`. After
+ * that, a missing ASSET — a path whose extension is a static file type — is a
+ * 404: answering it with the HTML shell would hand a script tag an HTML document.
+ * Anything else is a route the client renders, answered with the root
+ * `index.html`. A dot alone does not make a file: `/releases/1.2` is a route.
  */
 export async function resolveRequestFile(root, path) {
   const dir = resolve(root)
   const target = normalize(join(dir, path))
   if (target !== dir && !target.startsWith(dir + sep)) return null
-  if (extname(path)) return (await isFile(target)) ? target : null
-  for (const candidate of [join(target, 'index.html'), `${target}.html`, join(dir, 'index.html')]) {
+  for (const candidate of [target, join(target, 'index.html'), `${target}.html`]) {
     if (await isFile(candidate)) return candidate
   }
-  return null
+  if (CONTENT_TYPES[extname(path).toLowerCase()]) return null
+  const shell = join(dir, 'index.html')
+  return (await isFile(shell)) ? shell : null
 }
 
 /**

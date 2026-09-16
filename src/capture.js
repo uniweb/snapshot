@@ -73,20 +73,34 @@ async function measure(page) {
 }
 
 /**
- * Hide elements pinned to the bottom of the viewport.
+ * Hide what is pinned to the lower half of the first view.
  *
- * In a full-page capture such an element is painted where the FIRST viewport
- * ends, which lands it in the middle of the image. The test is geometric because
- * a positioned element's resolved `top` is a length, never `auto`, so styles
- * cannot tell a bottom-pinned bar from a top-pinned one.
+ * A full-page capture paints a pinned element where it sits in the FIRST view:
+ * a cookie bar, a chat button or a `sticky; bottom: 0` footer lands in the
+ * middle of the image, and a stuck sticky element leaves its own place in the
+ * page blank. Top-pinned elements (headers) sit where they belong, and are kept.
+ *
+ * The tests are geometric because a positioned element's resolved `top` is a
+ * length, never `auto`. A sticky element is only displaced while it is STUCK:
+ * one that merely sits in the lower half, or anywhere further down, is page
+ * content, so it is hidden only if making it static would move it.
  */
-async function hideBottomPinned(page) {
+async function hideLowerPinned(page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll('body *')) {
       const { position } = getComputedStyle(el)
       if (position !== 'fixed' && position !== 'sticky') continue
       const rect = el.getBoundingClientRect()
-      if (rect.bottom >= innerHeight - 1 && rect.top > innerHeight / 2) el.style.visibility = 'hidden'
+      const onScreen = rect.bottom > 0 && rect.top < innerHeight
+      if (!onScreen || rect.top < innerHeight / 2) continue
+      if (position === 'sticky') {
+        const previous = el.style.position
+        el.style.position = 'static'
+        const moved = Math.abs(el.getBoundingClientRect().top - rect.top) > 1
+        el.style.position = previous
+        if (!moved) continue
+      }
+      el.style.visibility = 'hidden'
     }
   })
 }
@@ -130,10 +144,11 @@ export async function openPage(browser, url, viewport = DESKTOP, { hide = [], ti
       screenshot: () => page.screenshot({ animations: 'disabled', caret: 'hide' }),
       /**
        * The page from the top, beyond the viewport, up to `maxHeight` CSS pixels.
-       * Hides bottom-pinned elements first, so take the viewport shot before this.
+       * Hides what is pinned to the lower half of the first view, so take the
+       * viewport shot before this.
        */
       async longScreenshot(maxHeight = Infinity) {
-        await hideBottomPinned(page)
+        await hideLowerPinned(page)
         const height = Math.max(1, Math.min(Math.ceil(maxHeight), measurements.scrollHeight))
         return page.screenshot({
           fullPage: true,

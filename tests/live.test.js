@@ -43,6 +43,26 @@ const TALL = `<!doctype html><html><head><style>
   <div class="pinned"></div><div class="banner"></div>
 </body></html>`
 
+// Pinned things that are NOT a full-width bottom bar: a chat button floating above
+// the bottom edge, a `sticky; bottom: 0` footer, and — real content that must stay
+// — a sticky element further down the page that is not stuck yet.
+const GREEN = [20, 160, 20]
+const PURPLE = [128, 0, 128]
+const PINNED = `<!doctype html><html><head><style>
+  body { margin: 0 }
+  .hero { height: 100vh; background: rgb(${RED}) }
+  .rest { height: 2400px; background: rgb(238, 238, 238) }
+  .spacer { height: 600px }
+  .sticky-late { position: sticky; top: 80px; height: 60px; background: rgb(${GREEN}) }
+  .fab { position: fixed; right: 24px; bottom: 24px; width: 56px; height: 56px; background: rgb(${YELLOW}) }
+  .footer { position: sticky; bottom: 0; height: 50px; background: rgb(${PURPLE}) }
+</style></head><body>
+  <div class="hero"></div>
+  <div class="rest"><div class="spacer"></div><div class="sticky-late"></div></div>
+  <div class="footer"></div>
+  <div class="fab"></div>
+</body></html>`
+
 const SHORT = `<!doctype html><html><head><style>
   body { margin: 0; background: #fafafa } main { height: 600px }
 </style></head><body><main>A page that does not scroll</main></body></html>`
@@ -58,6 +78,8 @@ beforeAll(async () => {
   await writeFile(join(dist, 'index.html'), TALL)
   await mkdir(join(dist, 'short'))
   await writeFile(join(dist, 'short', 'index.html'), SHORT)
+  await mkdir(join(dist, 'pinned'))
+  await writeFile(join(dist, 'pinned', 'index.html'), PINNED)
   server = await serveDirectory(dist)
 })
 
@@ -102,6 +124,29 @@ describe.skipIf(!browser)('capture, in a real browser', () => {
       expect(height).toBe(3800 * scale)
       // Where the bar was painted, the hero shows through.
       expect(near(await pixel(long, 700 * scale, 880 * scale), RED)).toBe(true)
+    } finally {
+      await page.close()
+    }
+  })
+
+  it('drops a floating button and a stuck footer from a long capture, and keeps sticky content further down', async () => {
+    const page = await openPage(browser, `${server.url}pinned`, DESKTOP)
+    try {
+      const scale = DESKTOP.deviceScaleFactor
+      const fab = [1388 * scale, 848 * scale]
+      const footer = [100 * scale, 875 * scale]
+      const stickyLate = [100 * scale, 1530 * scale]
+
+      // Controls: both pinned things are in the first view.
+      const first = await page.screenshot()
+      expect(near(await pixel(first, ...fab), YELLOW)).toBe(true)
+      expect(near(await pixel(first, ...footer), PURPLE)).toBe(true)
+
+      const long = await page.longScreenshot()
+      expect(near(await pixel(long, ...fab), RED)).toBe(true)
+      expect(near(await pixel(long, ...footer), RED)).toBe(true)
+      // Not stuck, so page content: still where it sits in the page.
+      expect(near(await pixel(long, ...stickyLate), GREEN)).toBe(true)
     } finally {
       await page.close()
     }

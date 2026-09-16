@@ -28,7 +28,9 @@ export function deviceGeometry({ canvas = DEFAULT_CANVAS, viewport = DESKTOP_VIE
   const margin = Math.round(64 * k)
   const bar = Math.round(30 * k)
 
-  const screenHeight = Math.round(H * 0.628)
+  // Scaled by the unit, not by the height alone: a tall, narrow canvas would
+  // otherwise get a phone wider than itself.
+  const screenHeight = Math.round(628 * k)
   const screenWidth = Math.round((screenHeight * mobile.width) / mobile.height)
   const bezel = Math.round((11 * screenWidth) / 290)
   const phone = {

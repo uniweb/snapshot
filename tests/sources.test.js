@@ -18,6 +18,8 @@ beforeAll(async () => {
   await writeFile(join(dist, 'pricing.html'), '<p>pricing</p>')
   await mkdir(join(dist, 'assets'))
   await writeFile(join(dist, 'assets', 'app.js'), 'export {}')
+  await mkdir(join(dist, 'releases', '1.2'), { recursive: true })
+  await writeFile(join(dist, 'releases', '1.2', 'index.html'), '<p>release 1.2</p>')
 })
 
 afterAll(async () => {
@@ -44,6 +46,12 @@ describe('resolveRequestFile', () => {
   it('never answers a missing file with the shell', async () => {
     expect(await resolveRequestFile(dist, '/assets/app.js')).toBe(join(dist, 'assets', 'app.js'))
     expect(await resolveRequestFile(dist, '/assets/missing.js')).toBeNull()
+    expect(await resolveRequestFile(dist, '/missing.webp')).toBeNull()
+  })
+
+  it('does not take a dot in a route for a file extension', async () => {
+    expect(await resolveRequestFile(dist, '/releases/1.2')).toBe(join(dist, 'releases', '1.2', 'index.html'))
+    expect(await resolveRequestFile(dist, '/releases/1.3')).toBe(join(dist, 'index.html'))
   })
 
   it('stays inside the directory', async () => {

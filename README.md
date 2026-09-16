@@ -12,7 +12,7 @@ uniweb snapshot
 ```
 
 That builds the site, captures it, writes `site/public/preview.webp`, and sets
-`preview: /preview.webp` in `site.yml`. See [`uniweb snapshot`](https://github.com/uniweb/docs/blob/main/reference/cli-commands.md#uniweb-snapshot)
+`preview: /preview.webp` in `site.yml`, unless it already names an image of yours. See [`uniweb snapshot`](https://github.com/uniweb/docs/blob/main/reference/cli-commands.md#uniweb-snapshot)
 for the command's options; the rest of this page is the library.
 
 ## Two layouts
@@ -99,9 +99,11 @@ It resolves to `{ buffer, width, height, format, bytes, file, layout, tone, page
 
 - **Viewport units are kept.** A `100vh` hero is as tall in the long capture as in the
   browser. The capture renders beyond the viewport without resizing it.
-- **Bottom-pinned elements are left out of the long capture.** A full-page capture would
-  otherwise paint a fixed cookie bar where the first viewport ends, in the middle of
-  the page. The first-view capture keeps it; use `hide` to drop it there too.
+- **What is pinned to the lower half of the first view is left out of the long capture.**
+  A full-page capture paints a cookie bar, a chat button or a `sticky; bottom: 0` footer
+  where the first viewport ends, in the middle of the page. Sticky content further down
+  the page is not pinned and stays. The first-view capture keeps everything; use `hide`
+  to drop an element there too.
 - **Motion is reduced** (`prefers-reduced-motion: reduce`) and CSS animations are
   stopped, so a capture is not caught mid-transition.
 

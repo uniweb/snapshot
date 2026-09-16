@@ -12,9 +12,19 @@ import {
 } from '../src/layouts/index.js'
 import { safeColor } from '../src/layouts/background.js'
 
+// The default, a social card, and the extremes `--size` accepts: wide and short,
+// tall and narrow. Every layout must stay on every one of them.
 const CANVASES = [
   { width: 1600, height: 1000 },
   { width: 1200, height: 630 },
+  { width: 1600, height: 630 },
+  { width: 1500, height: 500 },
+  { width: 1920, height: 1080 },
+  { width: 1000, height: 1000 },
+  { width: 800, height: 1200 },
+  { width: 4096, height: 200 },
+  { width: 320, height: 4096 },
+  { width: 320, height: 200 },
 ]
 
 const inside = (box, canvas) =>
@@ -70,13 +80,23 @@ describe('splitGeometry', () => {
     expect((strip.pageHeight * strip.width) / 1440).toBeGreaterThanOrEqual(strip.height)
   })
 
+  it('fills a 1600×1000 canvas margin to margin', () => {
+    const { window, strip } = splitGeometry({ pageHeight: 2348 })
+    expect(window.left).toBe(56)
+    expect(strip.left + strip.width).toBe(1600 - 56)
+  })
+
   for (const canvas of CANVASES) {
-    for (const pageHeight of [1200, 2348, 2630, 9000]) {
-      it(`keeps the window on a ${canvas.width}×${canvas.height} canvas and overlaps the strip (page ${pageHeight})`, () => {
+    for (const pageHeight of [900, 1200, 2348, 2630, 9000]) {
+      it(`keeps both on a ${canvas.width}×${canvas.height} canvas, overlapping and centred (page ${pageHeight})`, () => {
         const { window, strip } = splitGeometry({ canvas, pageHeight })
         expect(inside(window, canvas)).toBe(true)
+        expect(strip.left).toBeGreaterThanOrEqual(0)
         expect(strip.left + strip.width).toBeLessThanOrEqual(canvas.width)
+        if (strip.mode === 'card') expect(strip.top + strip.height).toBeLessThanOrEqual(canvas.height)
         expect(strip.left).toBeLessThan(window.left + window.width)
+        const right = canvas.width - (strip.left + strip.width)
+        expect(Math.abs(window.left - right)).toBeLessThanOrEqual(1)
       })
     }
   }

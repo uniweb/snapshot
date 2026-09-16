@@ -23,7 +23,9 @@ composing is here.
 - **A capture is always of a URL.** Serving a local site (`src/sources.js`) is a separate step, so a
   running dev server, a static build and a deployed site go through the same code.
 - **Behaviour claims are tested in a real browser.** `tests/live.test.js` holds each measured fact
-  (viewport units in a long capture, bottom-pinned elements, `hide`), with a control that proves the
+  (viewport units in a long capture, pinned and sticky elements, `hide`), with a control that proves the
   assertion can fail. It skips when no browser can be launched and says why;
   `UNIWEB_SNAPSHOT_REQUIRE_BROWSER=1` turns the skip into a failure.
 - **Palette values are data from the page.** They pass `safeColor` before they reach a stylesheet.
+- **Layouts must stay on any canvas `--size` accepts.** Lengths scale by the canvas unit, never by
+  one side alone, and `tests/layouts.test.js` checks a matrix of sizes including the extremes.

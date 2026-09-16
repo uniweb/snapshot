@@ -25,9 +25,11 @@ export function splitGeometry({ canvas = DEFAULT_CANVAS, pageHeight, viewport = 
   const margin = Math.round(56 * k)
   const overlap = Math.round(70 * k)
   const bar = Math.round(30 * k)
-  const minWidth = Math.round(W * 0.2375)
-  const maxWidth = Math.round(W * 0.35)
-  const preferredWidth = Math.round(W * 0.29375)
+  // Scaled by the unit, not by the width alone: a wide, short canvas would
+  // otherwise get a strip too wide for its height.
+  const minWidth = Math.round(380 * k)
+  const maxWidth = Math.round(560 * k)
+  const preferredWidth = Math.round(470 * k)
 
   const pageWidth = viewport.width
   const edgeWidth = Math.round(((H + 2) * pageWidth) / pageHeight)
@@ -42,12 +44,23 @@ export function splitGeometry({ canvas = DEFAULT_CANVAS, pageHeight, viewport = 
     const shown = Math.ceil(((H + 2) * pageWidth) / preferredWidth)
     strip = { mode: 'bleed', width: preferredWidth, height: H + 2, top: -1, pageHeight: shown }
   }
-  strip.left = W - margin - strip.width
+  const stripLeft = W - margin - strip.width
 
-  const windowWidth = strip.left + overlap - margin
-  const windowHeight = Math.round((windowWidth * viewport.height) / viewport.width) + bar
+  // The window fills the space left of the strip and overlaps it — unless that
+  // would make it taller than the canvas, in which case it is sized by height.
+  let windowWidth = stripLeft + overlap - margin
+  let windowHeight = Math.round((windowWidth * viewport.height) / viewport.width) + bar
+  if (windowHeight > H - 2 * margin) {
+    windowHeight = H - 2 * margin
+    windowWidth = Math.round(((windowHeight - bar) * viewport.width) / viewport.height)
+  }
+
+  // Keep the overlap, and centre the pair horizontally.
+  const windowLeft = stripLeft + overlap - windowWidth
+  const shift = Math.round((W - (stripLeft + strip.width - windowLeft)) / 2) - windowLeft
+  strip.left = stripLeft + shift
   const window = {
-    left: margin,
+    left: windowLeft + shift,
     top: Math.round((H - windowHeight) / 2),
     width: windowWidth,
     height: windowHeight,
