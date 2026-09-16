@@ -1,0 +1,42 @@
+{
+  "name": "@uniweb/snapshot",
+  "version": "0.1.0",
+  "description": "Preview images of a Uniweb site, composed from captures of the site running in a real browser.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./layouts": "./src/layouts/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "uniweb",
+    "screenshot",
+    "preview",
+    "site-card",
+    "playwright"
+  ],
+  "author": "Proximify",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uniweb/snapshot.git"
+  },
+  "homepage": "https://github.com/uniweb/snapshot#readme",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.7"
+  }
+}
