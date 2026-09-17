@@ -2,6 +2,9 @@
  * Capture: open a page in a real browser, let it finish, measure it, photograph it.
  */
 
+import { chooseLayout } from './layouts/index.js'
+import { meanLuminance } from './render.js'
+
 /** The desktop viewport every layout is designed around (16:10). */
 export const DESKTOP = { width: 1440, height: 900, deviceScaleFactor: 2 }
 
@@ -163,4 +166,52 @@ export async function openPage(browser, url, viewport = DESKTOP, { hide = [], ti
     await context.close().catch(() => {})
     throw err
   }
+}
+
+/**
+ * Everything a set of compositions is made from, captured once: the first view,
+ * and — as `plan` asks, once the page is measured — the long page and the phone
+ * view.
+ *
+ * @param {import('playwright-core').Browser} browser
+ * @param {string} url
+ * @param {object} [options]
+ * @param {string[]} [options.hide]
+ * @param {(context: { measurements: object, auto: 'split'|'device' }) => { long?: number, mobile?: boolean }} [options.plan]
+ *   What to capture beyond the first view: `long`, how many CSS pixels of the page,
+ *   and `mobile`, the phone view. Without a plan, both are captured in full.
+ * @returns {Promise<{ url: string, measurements: object, auto: 'split'|'device', luminance: number,
+ *                     shots: Record<string, Buffer>, longHeight: number }>}
+ */
+export async function captureSite(browser, url, { hide = [], plan } = {}) {
+  const shots = {}
+  let measurements
+  let auto
+  let needs
+  let longHeight = 0
+
+  const desktop = await openPage(browser, url, DESKTOP, { hide })
+  try {
+    measurements = desktop.measurements
+    auto = chooseLayout(measurements)
+    shots['desktop.png'] = await desktop.screenshot()
+    needs = plan ? plan({ measurements, auto }) : { long: Infinity, mobile: true }
+    if (needs.long) {
+      longHeight = Math.min(Math.ceil(needs.long), measurements.scrollHeight)
+      shots['long.png'] = await desktop.longScreenshot(longHeight)
+    }
+  } finally {
+    await desktop.close()
+  }
+
+  if (needs.mobile) {
+    const phone = await openPage(browser, url, MOBILE, { hide })
+    try {
+      shots['mobile.png'] = await phone.screenshot()
+    } finally {
+      await phone.close()
+    }
+  }
+
+  return { url, measurements, auto, luminance: await meanLuminance(shots['desktop.png']), shots, longHeight }
 }

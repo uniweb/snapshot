@@ -4,9 +4,8 @@ import { join } from 'node:path'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { normalizeBase, resolveRequestFile, serveDirectory } from '../src/sources.js'
+import { normalizeBase, resolveRequestFile, serveDirectory, targetUrl } from '../src/sources.js'
 import { formatFromPath } from '../src/render.js'
-import { targetUrl } from '../src/snapshot.js'
 
 let dist
 

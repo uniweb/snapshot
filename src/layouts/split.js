@@ -1,14 +1,15 @@
 /**
- * split — the page as a visitor first sees it, in a browser window, overlapped by
- * a long strip of the same page.
+ * split — the page as a visitor first sees it, in a browser window, beside a long
+ * strip of the same page.
  *
- * The strip follows one rule, picked by the width at which the WHOLE page would
- * exactly span the canvas height:
+ * The strip's width is `fit` or a ratio. `fit` picks the width at which the
+ * WHOLE page exactly spans the canvas height, when that width is sensible; a
+ * short page gets a wider card and a long one a preferred width. Whatever the
+ * width, the strip is then one of:
  *
- *   edge  — that width is sensible: the whole page runs top edge to bottom edge.
- *   card  — the page is too short for that: the whole page, as a centred card.
- *   bleed — the page is too long for that: the strip runs off both edges at a
- *           preferred width, and the canvas edge hides where the page is cut.
+ *   edge  — the whole page, top edge to bottom edge;
+ *   card  — the whole page, shorter than the canvas, centred;
+ *   bleed — the top of a longer page, running off both edges, which hide the cut.
  */
 
 import { DEFAULT_CANVAS, DESKTOP_VIEWPORT, documentHtml, frameCss, unitOf, windowHtml } from './shared.js'
@@ -18,56 +19,68 @@ import { DEFAULT_CANVAS, DESKTOP_VIEWPORT, documentHtml, frameCss, unitOf, windo
  * @param {{ width: number, height: number }} [input.canvas]
  * @param {number} input.pageHeight - the page's full height in CSS pixels, at the desktop viewport
  * @param {{ width: number, height: number }} [input.viewport] - the desktop viewport
+ * @param {number} [input.spacing] - pixels at 1600×1000: positive is a gap, negative an overlap
+ * @param {'fit'|number} [input.strip] - `fit`, or N for a strip one wide by N tall
+ * @param {'right'|'left'} [input.side] - where the strip goes
+ * @param {'browser'|'plain'} [input.frame]
  */
-export function splitGeometry({ canvas = DEFAULT_CANVAS, pageHeight, viewport = DESKTOP_VIEWPORT }) {
+export function splitGeometry({
+  canvas = DEFAULT_CANVAS,
+  pageHeight,
+  viewport = DESKTOP_VIEWPORT,
+  spacing = 48,
+  strip = 'fit',
+  side = 'right',
+  frame = 'browser',
+}) {
   const { width: W, height: H } = canvas
   const k = unitOf(canvas)
   const margin = Math.round(56 * k)
-  const overlap = Math.round(70 * k)
-  const bar = Math.round(30 * k)
-  // Scaled by the unit, not by the width alone: a wide, short canvas would
-  // otherwise get a strip too wide for its height.
-  const minWidth = Math.round(380 * k)
-  const maxWidth = Math.round(560 * k)
-  const preferredWidth = Math.round(470 * k)
+  const bar = frame === 'plain' ? 0 : Math.round(30 * k)
+  const usable = W - 2 * margin
 
-  const pageWidth = viewport.width
-  const edgeWidth = Math.round(((H + 2) * pageWidth) / pageHeight)
-
-  let strip
-  if (edgeWidth >= minWidth && edgeWidth <= Math.round(maxWidth * 1.1)) {
-    strip = { mode: 'edge', width: edgeWidth, height: H + 2, top: -1, pageHeight }
-  } else if (edgeWidth > maxWidth * 1.1) {
-    const height = Math.round((pageHeight * maxWidth) / pageWidth)
-    strip = { mode: 'card', width: maxWidth, height, top: Math.round((H - height) / 2), pageHeight }
+  let width
+  if (strip === 'fit') {
+    const edgeWidth = Math.round(((H + 2) * viewport.width) / pageHeight)
+    const min = Math.round(380 * k)
+    const max = Math.round(560 * k)
+    if (edgeWidth >= min && edgeWidth <= Math.round(max * 1.1)) width = edgeWidth
+    else width = edgeWidth > max * 1.1 ? max : Math.round(470 * k)
   } else {
-    const shown = Math.ceil(((H + 2) * pageWidth) / preferredWidth)
-    strip = { mode: 'bleed', width: preferredWidth, height: H + 2, top: -1, pageHeight: shown }
+    width = Math.round(H / strip)
   }
-  const stripLeft = W - margin - strip.width
+  width = Math.min(width, Math.round(usable / 2))
 
-  // The window fills the space left of the strip and overlaps it — unless that
-  // would make it taller than the canvas, in which case it is sized by height.
-  let windowWidth = stripLeft + overlap - margin
+  const drawn = (pageHeight * width) / viewport.width
+  let s
+  if (Math.abs(drawn - (H + 2)) <= 2) s = { mode: 'edge', height: H + 2, top: -1, pageHeight }
+  else if (drawn < H) s = { mode: 'card', height: Math.round(drawn), top: Math.round((H - drawn) / 2), pageHeight }
+  else s = { mode: 'bleed', height: H + 2, top: -1, pageHeight: Math.ceil(((H + 2) * viewport.width) / width) }
+  s.width = width
+
+  // The window takes the rest of the width, never less than 30% of it, and is
+  // sized by height instead when it would be taller than the canvas allows.
+  const gap = Math.round(spacing * k)
+  let windowWidth = Math.max(usable - width - gap, Math.round(usable * 0.3))
   let windowHeight = Math.round((windowWidth * viewport.height) / viewport.width) + bar
   if (windowHeight > H - 2 * margin) {
     windowHeight = H - 2 * margin
     windowWidth = Math.round(((windowHeight - bar) * viewport.width) / viewport.height)
   }
+  const between = Math.min(gap, usable - width - windowWidth)
 
-  // Keep the overlap, and centre the pair horizontally.
-  const windowLeft = stripLeft + overlap - windowWidth
-  const shift = Math.round((W - (stripLeft + strip.width - windowLeft)) / 2) - windowLeft
-  strip.left = stripLeft + shift
-  const window = {
-    left: windowLeft + shift,
-    top: Math.round((H - windowHeight) / 2),
-    width: windowWidth,
-    height: windowHeight,
-    bar,
+  // Centre the pair.
+  const left = Math.round((W - (windowWidth + between + width)) / 2)
+  const window = { top: Math.round((H - windowHeight) / 2), width: windowWidth, height: windowHeight, bar }
+  if (side === 'left') {
+    s.left = left
+    window.left = left + width + between
+  } else {
+    window.left = left
+    s.left = left + windowWidth + between
   }
 
-  return { canvas: { width: W, height: H }, k, window, strip }
+  return { canvas: { width: W, height: H }, k, window, strip: s, gap: between }
 }
 
 /**

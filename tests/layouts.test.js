@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  LOOK_DEFAULTS,
   SCROLL_RATIO,
   backgroundCss,
   chooseLayout,
   deviceGeometry,
   deviceHtml,
+  parseStrip,
+  resolveLook,
   splitGeometry,
   splitHtml,
   toneFor,
@@ -27,8 +30,26 @@ const CANVASES = [
   { width: 320, height: 200 },
 ]
 
+// Looks at their extremes, as `resolveLook` would hand them to a geometry.
+const LOOKS = [
+  {},
+  { spacing: -70 },
+  { spacing: 400 },
+  { spacing: -400 },
+  { strip: 1 },
+  { strip: 8 },
+  { side: 'left' },
+  { side: 'left', spacing: -70, frame: 'plain' },
+]
+
 const inside = (box, canvas) =>
   box.left >= 0 && box.left + box.width <= canvas.width && box.top >= 0 && box.top + box.height <= canvas.height
+
+/** The two frames, left to right, and the space between them (negative when they overlap). */
+function pair(a, b) {
+  const [first, second] = a.left <= b.left ? [a, b] : [b, a]
+  return { left: first.left, right: second.left + second.width, between: second.left - (first.left + first.width) }
+}
 
 describe('chooseLayout', () => {
   const viewport = { width: 1440, height: 900 }
@@ -49,6 +70,41 @@ describe('toneFor', () => {
   it('puts a light page on a deep background and a dark page on a light one', () => {
     expect(toneFor(0.9)).toBe('deep')
     expect(toneFor(0.3)).toBe('light')
+  })
+})
+
+describe('resolveLook', () => {
+  it('starts from the layout defaults: a gap for split, an overlap for device', () => {
+    expect(resolveLook('split')).toEqual({ spacing: 48, strip: 'fit', side: 'right', frame: 'browser' })
+    expect(resolveLook('device')).toEqual({ spacing: -31, strip: 'fit', side: 'right', frame: 'browser' })
+    expect(LOOK_DEFAULTS.split.gap).toBe(48)
+  })
+
+  it('takes a gap or an overlap, never both', () => {
+    expect(resolveLook('split', { overlap: 70 }).spacing).toBe(-70)
+    expect(resolveLook('device', { gap: 20 }).spacing).toBe(20)
+    expect(() => resolveLook('split', { gap: 10, overlap: 10 })).toThrow(/not both/)
+    expect(() => resolveLook('split', { gap: -5 })).toThrow(/0 to 400/)
+    expect(() => resolveLook('split', { overlap: 'wide' })).toThrow(/0 to 400/)
+  })
+
+  it('refuses a side or frame it does not know', () => {
+    expect(() => resolveLook('split', { side: 'top' })).toThrow(/Unknown side/)
+    expect(() => resolveLook('device', { frame: 'phone' })).toThrow(/Unknown frame/)
+    expect(() => resolveLook('tilt')).toThrow(/Unknown layout/)
+  })
+})
+
+describe('parseStrip', () => {
+  it('reads fit, 1:N and N', () => {
+    expect(parseStrip('fit')).toBe('fit')
+    expect(parseStrip(undefined)).toBe('fit')
+    expect(parseStrip('1:2.5')).toBe(2.5)
+    expect(parseStrip(3)).toBe(3)
+  })
+
+  it('refuses anything else', () => {
+    for (const bad of ['0', '1:0.5', '1:9', '2:3', 'wide']) expect(() => parseStrip(bad)).toThrow(/fit` or 1:N/)
   })
 })
 
@@ -80,38 +136,84 @@ describe('splitGeometry', () => {
     expect((strip.pageHeight * strip.width) / 1440).toBeGreaterThanOrEqual(strip.height)
   })
 
-  it('fills a 1600×1000 canvas margin to margin', () => {
+  it('leaves a 48px gap by default, and still fills the canvas margin to margin', () => {
     const { window, strip } = splitGeometry({ pageHeight: 2348 })
+    expect(strip.left - (window.left + window.width)).toBe(48)
     expect(window.left).toBe(56)
     expect(strip.left + strip.width).toBe(1600 - 56)
   })
 
+  it('overlaps instead when asked, as it used to by default', () => {
+    const { window, strip } = splitGeometry({ pageHeight: 2348, spacing: -70 })
+    expect([window.left, window.width, strip.left]).toEqual([56, 943, 929])
+  })
+
+  it('shows more of a long page with a narrower strip, and a short page as a smaller card', () => {
+    const long = splitGeometry({ pageHeight: 4014, strip: 2.5 }).strip
+    expect([long.mode, long.width, long.pageHeight]).toEqual(['bleed', 400, 3608])
+    expect(long.pageHeight).toBeGreaterThan(splitGeometry({ pageHeight: 4014 }).strip.pageHeight)
+    const short = splitGeometry({ pageHeight: 2348, strip: 2.5 }).strip
+    expect([short.mode, short.width, short.pageHeight]).toEqual(['card', 400, 2348])
+  })
+
+  it('puts the strip on the left when asked', () => {
+    const { window, strip } = splitGeometry({ pageHeight: 2348, side: 'left' })
+    expect(strip.left).toBe(56)
+    expect(window.left - (strip.left + strip.width)).toBe(48)
+  })
+
+  it('draws a plain frame without a title bar', () => {
+    const geometry = splitGeometry({ pageHeight: 2348, frame: 'plain' })
+    expect(geometry.window.bar).toBe(0)
+    expect(splitHtml({ geometry, background: 'white' })).not.toContain('class="bar"')
+  })
+
   for (const canvas of CANVASES) {
-    for (const pageHeight of [900, 1200, 2348, 2630, 9000]) {
-      it(`keeps both on a ${canvas.width}×${canvas.height} canvas, overlapping and centred (page ${pageHeight})`, () => {
-        const { window, strip } = splitGeometry({ canvas, pageHeight })
-        expect(inside(window, canvas)).toBe(true)
-        expect(strip.left).toBeGreaterThanOrEqual(0)
-        expect(strip.left + strip.width).toBeLessThanOrEqual(canvas.width)
-        if (strip.mode === 'card') expect(strip.top + strip.height).toBeLessThanOrEqual(canvas.height)
-        expect(strip.left).toBeLessThan(window.left + window.width)
-        const right = canvas.width - (strip.left + strip.width)
-        expect(Math.abs(window.left - right)).toBeLessThanOrEqual(1)
-      })
+    for (const look of LOOKS) {
+      for (const pageHeight of [900, 2348, 9000]) {
+        it(`stays on a ${canvas.width}×${canvas.height} canvas, centred, spaced as asked (${JSON.stringify(look)}, page ${pageHeight})`, () => {
+          const geometry = splitGeometry({ canvas, pageHeight, ...look })
+          const { window, strip } = geometry
+          expect(inside(window, canvas)).toBe(true)
+          expect(strip.left).toBeGreaterThanOrEqual(0)
+          expect(strip.left + strip.width).toBeLessThanOrEqual(canvas.width)
+          if (strip.mode === 'card') expect(strip.top + strip.height).toBeLessThanOrEqual(canvas.height)
+          const { left, right, between } = pair(window, strip)
+          expect(between).toBe(geometry.gap)
+          expect(Math.sign(between)).toBe(Math.sign(look.spacing ?? 48))
+          expect(Math.abs(left - (canvas.width - right))).toBeLessThanOrEqual(1)
+        })
+      }
     }
   }
 })
 
 describe('deviceGeometry', () => {
+  it('overlaps the phone on the window by default', () => {
+    const { window, phone, gap } = deviceGeometry()
+    expect(gap).toBe(-31)
+    expect(phone.left).toBe(window.left + window.width - 31)
+  })
+
+  it('separates them, or swaps sides, when asked', () => {
+    const spaced = deviceGeometry({ spacing: 48 })
+    expect(spaced.phone.left - (spaced.window.left + spaced.window.width)).toBe(48)
+    const left = deviceGeometry({ side: 'left' })
+    expect(left.phone.left).toBeLessThan(left.window.left)
+  })
+
   for (const canvas of CANVASES) {
-    it(`keeps both frames on a ${canvas.width}×${canvas.height} canvas, overlapping, centred`, () => {
-      const { window, phone } = deviceGeometry({ canvas })
-      expect(inside(window, canvas)).toBe(true)
-      expect(inside(phone, canvas)).toBe(true)
-      expect(phone.left).toBeLessThan(window.left + window.width)
-      const right = canvas.width - (phone.left + phone.width)
-      expect(Math.abs(window.left - right)).toBeLessThanOrEqual(1)
-    })
+    for (const look of LOOKS) {
+      it(`keeps both frames on a ${canvas.width}×${canvas.height} canvas, centred (${JSON.stringify(look)})`, () => {
+        const geometry = deviceGeometry({ canvas, ...look })
+        const { window, phone } = geometry
+        expect(inside(window, canvas)).toBe(true)
+        expect(inside(phone, canvas)).toBe(true)
+        const { left, right, between } = pair(window, phone)
+        expect(between).toBe(geometry.gap)
+        expect(Math.abs(left - (canvas.width - right))).toBeLessThanOrEqual(1)
+      })
+    }
   }
 
   it('gives the phone screen the phone viewport aspect ratio', () => {

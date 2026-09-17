@@ -48,10 +48,10 @@ export function documentHtml({ canvas, background, css, body }) {
 </style></head><body>${body}</body></html>`
 }
 
-/** A browser window around a capture. */
+/** A browser window around a capture — with a title bar, or plain when `bar` is 0. */
 export function windowHtml({ left, top, width, bar }, src) {
+  const titleBar = bar ? `<div class="bar" style="height:${bar}px"><i></i><i></i><i></i></div>` : ''
   return `<div class="window" style="left:${left}px;top:${top}px;width:${width}px">
-    <div class="bar" style="height:${bar}px"><i></i><i></i><i></i></div>
-    <img class="shot" src="${src}" alt="">
+    ${titleBar}<img class="shot" src="${src}" alt="">
   </div>`
 }

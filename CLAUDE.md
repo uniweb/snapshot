@@ -20,6 +20,9 @@ composing is here.
   imports, no browser, no I/O. That keeps them unit-testable and usable anywhere.
 - **Nothing downloads a browser.** `launchBrowser` uses what is installed; an install is a step the
   user takes. `playwright-core` (no bundled browsers) is the dependency, never `playwright`.
+- **Capture once, compose many.** `captureSite` takes what the planned looks need and `compose`
+  draws any look from it; `snapshot` and `compare` are both that. A look is data (`resolveLook`),
+  never a new code path, so a new option belongs in `layouts/options.js` and the geometries.
 - **A capture is always of a URL.** Serving a local site (`src/sources.js`) is a separate step, so a
   running dev server, a static build and a deployed site go through the same code.
 - **Behaviour claims are tested in a real browser.** `tests/live.test.js` holds each measured fact

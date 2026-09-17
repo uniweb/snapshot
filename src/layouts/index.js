@@ -1,9 +1,11 @@
 /**
- * The layouts, and the two automatic choices: which layout, and which tone.
+ * The layouts, the look options they share, and the two automatic choices:
+ * which layout, and which tone.
  */
 
 export { DEFAULT_CANVAS } from './shared.js'
 export { TONES, backgroundCss } from './background.js'
+export { FRAMES, LOOK_DEFAULTS, SIDES, parseStrip, resolveLook } from './options.js'
 export { splitGeometry, splitHtml } from './split.js'
 export { deviceGeometry, deviceHtml } from './device.js'
 

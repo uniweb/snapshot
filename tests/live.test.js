@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { DESKTOP, launchBrowser, openPage, serveDirectory, snapshot } from '../src/index.js'
+import { DESKTOP, captureSite, compare, compose, launchBrowser, openPage, serveDirectory, snapshot } from '../src/index.js'
 
 let browser = null
 let skipReason = ''
@@ -163,6 +163,44 @@ describe.skipIf(!browser)('capture, in a real browser', () => {
       await shown.close()
       await hidden.close()
     }
+  })
+})
+
+describe.skipIf(!browser)('one capture, composed many ways', () => {
+  it('composes different looks from the same capture', async () => {
+    const captured = await captureSite(browser, server.url)
+    const gap = await compose(browser, captured, { format: 'png' })
+    const overlap = await compose(browser, captured, { overlap: 70, format: 'png' })
+    const phone = await compose(browser, captured, { layout: 'device', format: 'png' })
+    expect([gap.layout, overlap.layout, phone.layout]).toEqual(['split', 'split', 'device'])
+    expect(gap.look.spacing).toBe(48)
+    expect(overlap.look.spacing).toBe(-70)
+    expect(gap.buffer.equals(overlap.buffer)).toBe(false)
+  })
+
+  it('refuses a look that shows more of the page than was captured', async () => {
+    const captured = await captureSite(browser, server.url, { plan: () => ({ long: 1200 }) })
+    await expect(compose(browser, captured, {})).rejects.toThrow(/long capture is 1200px/)
+    await expect(compose(browser, captured, { layout: 'device' })).rejects.toThrow(/no phone view/)
+  })
+
+  it('puts the variants of a scrolling page on one sheet', async () => {
+    const output = join(out, 'compare-tall.webp')
+    const result = await compare({ browser, url: server.url, output })
+    expect(result.variants.map((v) => v.label)).toEqual([
+      'current', 'overlap 70', 'strip 1:2.5', 'side left', 'frame plain', `tone ${result.variants[0].tone === 'light' ? 'deep' : 'light'}`, 'layout device',
+    ])
+    expect(result.variants[6].layout).toBe('device')
+    // Seven cells, two columns, four rows of 780×488 with captions.
+    const meta = await sharp(await readFile(output)).metadata()
+    expect([meta.width, meta.height]).toEqual([1620, 40 + 4 * (34 + 488) + 3 * 22])
+  })
+
+  it('captions variants however the caller writes them', async () => {
+    const result = await compare({ browser, url: server.url, route: '/short', label: (changes, i) => `#${i}` })
+    expect(result.variants.map((v) => v.label)).toEqual(['#0', '#1', '#2', '#3', '#4', '#5'])
+    expect(result.variants[0].layout).toBe('device')
+    expect(result.height).toBe(40 + 3 * (34 + 488) + 2 * 22)
   })
 })
 

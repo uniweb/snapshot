@@ -44,6 +44,13 @@ const CONTENT_TYPES = {
   '.wasm': 'application/wasm',
 }
 
+/** The page to open: `url` itself, or `route` resolved under it. */
+export function targetUrl(url, route) {
+  if (!route || route === '/') return url
+  const base = url.endsWith('/') ? url : `${url}/`
+  return new URL(route.replace(/^\/+/, ''), base).href
+}
+
 /** `docs` → `/docs/`; `/` → `/`. */
 export function normalizeBase(base = '/') {
   const trimmed = String(base).trim().replace(/^\/+|\/+$/g, '')

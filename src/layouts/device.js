@@ -1,6 +1,6 @@
 /**
  * device — the page in a desktop browser window, with a phone showing the same
- * page in front of it.
+ * page beside or in front of it.
  *
  * For a site whose document does not scroll as one long page — a documentation
  * site's fixed shell, an app — where a long strip would only repeat the viewport.
@@ -21,12 +21,23 @@ import {
  * @param {{ width: number, height: number }} [input.canvas]
  * @param {{ width: number, height: number }} [input.viewport] - the desktop viewport
  * @param {{ width: number, height: number }} [input.mobile] - the phone viewport
+ * @param {number} [input.spacing] - pixels at 1600×1000: positive is a gap, negative an overlap
+ * @param {'right'|'left'} [input.side] - where the phone goes
+ * @param {'browser'|'plain'} [input.frame]
  */
-export function deviceGeometry({ canvas = DEFAULT_CANVAS, viewport = DESKTOP_VIEWPORT, mobile = MOBILE_VIEWPORT } = {}) {
+export function deviceGeometry({
+  canvas = DEFAULT_CANVAS,
+  viewport = DESKTOP_VIEWPORT,
+  mobile = MOBILE_VIEWPORT,
+  spacing = -31,
+  side = 'right',
+  frame = 'browser',
+} = {}) {
   const { width: W, height: H } = canvas
   const k = unitOf(canvas)
   const margin = Math.round(64 * k)
-  const bar = Math.round(30 * k)
+  const bar = frame === 'plain' ? 0 : Math.round(30 * k)
+  const usable = W - 2 * margin
 
   // Scaled by the unit, not by the height alone: a tall, narrow canvas would
   // otherwise get a phone wider than itself.
@@ -41,31 +52,34 @@ export function deviceGeometry({ canvas = DEFAULT_CANVAS, viewport = DESKTOP_VIE
     screen: { width: screenWidth, height: screenHeight, radius: Math.round(screenWidth * 0.131) },
   }
 
-  let windowWidth = Math.round(W * 0.744)
+  const gap = Math.round(spacing * k)
+  let windowWidth = Math.max(Math.min(Math.round(W * 0.744), usable - phone.width - gap), Math.round(usable * 0.3))
   let windowHeight = Math.round((windowWidth * viewport.height) / viewport.width) + bar
   if (windowHeight > H - 2 * margin) {
     windowHeight = H - 2 * margin
     windowWidth = Math.round(((windowHeight - bar) * viewport.width) / viewport.height)
   }
+  const between = Math.min(gap, usable - phone.width - windowWidth)
+
   const window = {
-    left: margin,
     top: Math.max(margin, Math.round((H - windowHeight) / 2 - 30 * k)),
     width: windowWidth,
     height: windowHeight,
     bar,
   }
-
-  // The phone overlaps the window's right edge, and never leaves the canvas.
-  phone.left = Math.min(W - margin - phone.width, window.left + window.width - Math.round(phone.width * 0.1))
   phone.top = H - phone.height - Math.round(48 * k)
 
-  // Centre the pair horizontally.
-  const groupRight = Math.max(window.left + window.width, phone.left + phone.width)
-  const shift = Math.round((W - (groupRight - window.left)) / 2) - window.left
-  window.left += shift
-  phone.left += shift
+  // Centre the pair.
+  const left = Math.round((W - (windowWidth + between + phone.width)) / 2)
+  if (side === 'left') {
+    phone.left = left
+    window.left = left + phone.width + between
+  } else {
+    window.left = left
+    phone.left = left + windowWidth + between
+  }
 
-  return { canvas: { width: W, height: H }, k, window, phone }
+  return { canvas: { width: W, height: H }, k, window, phone, gap: between }
 }
 
 /**
