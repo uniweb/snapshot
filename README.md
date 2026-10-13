@@ -47,7 +47,7 @@ one sheet (`compare()` below, or `uniweb snapshot --compare`).
 
 ## Requirements
 
-- Node.js 20.19 or later.
+- Node.js 22.12 or later.
 - A Chromium-based browser **that is already installed**: Google Chrome or Microsoft
   Edge. Nothing is downloaded. To use another build, point `UNIWEB_SNAPSHOT_BROWSER`
   at its executable, or install a headless Chromium once:
