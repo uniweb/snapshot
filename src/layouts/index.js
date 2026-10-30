@@ -8,6 +8,7 @@ export { TONES, backgroundCss } from './background.js'
 export { FRAMES, LOOK_DEFAULTS, SIDES, parseStrip, resolveLook } from './options.js'
 export { splitGeometry, splitHtml } from './split.js'
 export { deviceGeometry, deviceHtml } from './device.js'
+export { SHARE_CANVAS, shareHtml, shareViewport } from './share.js'
 
 export const LAYOUTS = ['split', 'device']
 

@@ -114,10 +114,11 @@ async function hideLowerPinned(page) {
  * @param {import('playwright-core').Browser} browser
  * @param {string} url
  * @param {typeof DESKTOP} [viewport]
- * @param {{ hide?: string[], timeout?: number }} [options]
+ * @param {{ hide?: string[], css?: string, timeout?: number }} [options]
  *   `hide` — CSS selectors to hide before anything is captured (a cookie banner, a chat bubble)
+ *   `css` — a stylesheet to apply before anything is captured
  */
-export async function openPage(browser, url, viewport = DESKTOP, { hide = [], timeout = DEFAULT_TIMEOUT } = {}) {
+export async function openPage(browser, url, viewport = DESKTOP, { hide = [], css = '', timeout = DEFAULT_TIMEOUT } = {}) {
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     deviceScaleFactor: viewport.deviceScaleFactor ?? 1,
@@ -138,6 +139,7 @@ export async function openPage(browser, url, viewport = DESKTOP, { hide = [], ti
     if (hide.length) {
       await page.addStyleTag({ content: hide.map((selector) => `${selector}{visibility:hidden!important}`).join('\n') })
     }
+    if (css) await page.addStyleTag({ content: css })
     const measurements = await measure(page)
 
     return {
@@ -145,6 +147,8 @@ export async function openPage(browser, url, viewport = DESKTOP, { hide = [], ti
       measurements,
       /** The viewport, as a visitor first sees it. */
       screenshot: () => page.screenshot({ animations: 'disabled', caret: 'hide' }),
+      /** Hide what is pinned to the lower half of the first view: a cookie bar, a chat button. */
+      hidePinned: () => hideLowerPinned(page),
       /**
        * The page from the top, beyond the viewport, up to `maxHeight` CSS pixels.
        * Hides what is pinned to the lower half of the first view, so take the

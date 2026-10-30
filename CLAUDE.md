@@ -11,6 +11,11 @@ Preview images of a site, composed from captures of the site running in a real b
 puts it behind a URL, and records the image as `site.yml::preview`. Everything about capturing and
 composing is here.
 
+A site's link preview image is here too (`shareCard`, `src/share-card.js`, `uniweb snapshot --share`):
+the first view filling the image, recorded as `seo.image`. It sits beside `snapshot()` and is not one
+of `LAYOUTS`, because template previews depend on those and on `auto` choosing between them. A change
+for one image is not a reason to touch the other's path.
+
 ## Rules that shape every file here
 
 - **One browser does both jobs.** It captures the site and it rasterizes the composition, which is

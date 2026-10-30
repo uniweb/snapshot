@@ -130,6 +130,21 @@ It takes `snapshot()`'s options (`output` is the sheet), and `label(changes, ind
 caption each variant your own way. `normalizeOptions(options)` checks a set of options
 without opening anything.
 
+### `shareCard(options)`
+
+A link preview image: the first view of a page filling the image, with no frame and no
+background. It sits beside `snapshot()` and takes none of its looks.
+
+```js
+const { bytes } = await shareCard({ url: server.url, output: 'site/public/share-card.png' })
+```
+
+`url`, `route`, `scale`, `output`, `quality`, `hide` and `browser` are `snapshot()`'s. `canvas`
+defaults to `{ width: 1200, height: 630 }`, `format` comes from `output`, else `'png'`, and `css`
+is a stylesheet, as text, applied before capturing. The page is captured in a viewport of the
+canvas's shape, 1440 pixels wide, and what is pinned to the lower half of it is hidden. It resolves
+to `{ buffer, width, height, format, bytes, file, page }`.
+
 ### The pieces
 
 `snapshot()` is `captureSite()` and `compose()`, which are built from these. Each is

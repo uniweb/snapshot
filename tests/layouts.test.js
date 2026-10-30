@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  LAYOUTS,
   LOOK_DEFAULTS,
   SCROLL_RATIO,
+  SHARE_CANVAS,
   backgroundCss,
   chooseLayout,
   deviceGeometry,
   deviceHtml,
   parseStrip,
   resolveLook,
+  shareHtml,
+  shareViewport,
   splitGeometry,
   splitHtml,
   toneFor,
@@ -249,5 +253,34 @@ describe('backgroundCss', () => {
     expect(safeColor('red;}</style><script>alert(1)</script>')).toBeNull()
     expect(backgroundCss({ 'primary-700': 'red;}</style>' }, 'deep')).not.toContain('</style>')
     expect(safeColor('rgb(15 23 42 / .5)')).toBe('rgb(15 23 42 / .5)')
+  })
+})
+
+describe('the share image', () => {
+  it('captures the shape of its canvas at a desktop width', () => {
+    expect(shareViewport(SHARE_CANVAS, 1440)).toEqual({ width: 1440, height: 756 })
+    expect(shareViewport({ width: 1000, height: 1000 }, 1440)).toEqual({ width: 1440, height: 1440 })
+  })
+
+  it('stays a real viewport on any canvas --size accepts', () => {
+    for (const canvas of [{ width: 320, height: 200 }, { width: 4096, height: 200 }, { width: 320, height: 4096 }, { width: 4096, height: 4096 }]) {
+      const { width, height } = shareViewport(canvas, 1440)
+      expect(width).toBe(1440)
+      expect(height).toBeGreaterThan(0)
+      expect(Number.isInteger(height)).toBe(true)
+    }
+  })
+
+  it('draws the capture across the canvas, and nothing else', () => {
+    const html = shareHtml({ view: 'view.png' })
+    expect(html).toContain('src="view.png"')
+    expect(html).toContain('width:100%; height:100%')
+    expect(html).not.toContain('window')
+  })
+
+  it('⛔ is no layout: `auto` and a comparison choose among the two that show a whole page', () => {
+    expect(LAYOUTS).toEqual(['split', 'device'])
+    expect(chooseLayout({ scrollHeight: 5000, viewport: { height: 900 } })).toBe('split')
+    expect(chooseLayout({ scrollHeight: 900, viewport: { height: 900 } })).toBe('device')
   })
 })

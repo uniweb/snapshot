@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { DESKTOP, captureSite, compare, compose, launchBrowser, openPage, serveDirectory, snapshot } from '../src/index.js'
+import { DESKTOP, captureSite, compare, compose, launchBrowser, openPage, serveDirectory, shareCard, snapshot } from '../src/index.js'
 
 let browser = null
 let skipReason = ''
@@ -233,5 +233,74 @@ describe.skipIf(!browser)('snapshot(), in a real browser', () => {
     await expect(snapshot({ browser, url: server.url, layout: 'tilt' })).rejects.toThrow(/Unknown layout/)
     await expect(snapshot({ browser, url: server.url, output: join(out, 'card.gif') })).rejects.toThrow(/format/)
     await expect(snapshot({ browser })).rejects.toThrow(/url/)
+  })
+})
+
+describe.skipIf(!browser)('the share image', () => {
+  const size = async (buffer) => {
+    const { width, height, format } = await sharp(buffer).metadata()
+    return { width, height, format }
+  }
+
+  it('⭐ fills a 1200×630 PNG with the first view: no frame, no background', async () => {
+    const card = await shareCard({ browser, url: server.url })
+    expect(await size(card.buffer)).toEqual({ width: 1200, height: 630, format: 'png' })
+    expect(card.bytes).toBe(card.buffer.length)
+    // The hero to the edges, on every side: a frame or a background would show here.
+    for (const [x, y] of [[1199, 0], [1199, 400], [600, 629], [0, 629], [1199, 629]]) {
+      expect(near(await pixel(card.buffer, x, y), RED), `pixel ${x},${y}`).toBe(true)
+    }
+  })
+
+  it('CONTROL: a preview of the same page has a frame on a background, so the check above can fail', async () => {
+    const preview = await snapshot({ browser, url: server.url, canvas: { width: 1200, height: 630 }, format: 'png' })
+    expect(near(await pixel(preview.buffer, 1199, 629), RED)).toBe(false)
+  })
+
+  it('captures the shape of its canvas, at a desktop width', async () => {
+    const card = await shareCard({ browser, url: server.url })
+    expect(card.page.viewport).toEqual({ width: 1440, height: 756 })
+    const square = await shareCard({ browser, url: server.url, canvas: { width: 600, height: 600 } })
+    expect(square.page.viewport).toEqual({ width: 1440, height: 1440 })
+    expect(await size(square.buffer)).toEqual({ width: 600, height: 600, format: 'png' })
+    const double = await shareCard({ browser, url: server.url, scale: 2 })
+    expect(await size(double.buffer)).toMatchObject({ width: 2400, height: 1260 })
+  })
+
+  it('⭐ applies a stylesheet before capturing, and only when given one', async () => {
+    const css = '.hero { background: rgb(20, 160, 20) !important }'
+    const styled = await shareCard({ browser, url: server.url, css })
+    expect(near(await pixel(styled.buffer, 1199, 400), GREEN)).toBe(true)
+    const plain = await shareCard({ browser, url: server.url })
+    expect(near(await pixel(plain.buffer, 1199, 400), RED)).toBe(true)
+  })
+
+  it('hides what it is asked to, and what is pinned to the lower half of the view', async () => {
+    const first = await openPage(browser, server.url, { width: 1440, height: 756, deviceScaleFactor: 1 })
+    try {
+      // Control: the bar is in this view, and the banner too.
+      expect(near(await pixel(await first.screenshot(), 700, 740), YELLOW)).toBe(true)
+    } finally {
+      await first.close()
+    }
+    const card = await shareCard({ browser, url: server.url, hide: ['.banner'] })
+    expect(near(await pixel(card.buffer, 600, 620), RED), 'the pinned bar').toBe(true)
+    expect(near(await pixel(card.buffer, 15, 15), RED), 'the banner').toBe(true)
+    const kept = await shareCard({ browser, url: server.url })
+    expect(near(await pixel(kept.buffer, 15, 15), [0, 0, 255]), 'the banner, not asked to hide').toBe(true)
+  })
+
+  it('takes a page, and writes the format its file names', async () => {
+    const file = join(out, 'nested', 'card.jpg')
+    const card = await shareCard({ browser, url: server.url, route: '/short', output: file })
+    expect(card.file).toBe(file)
+    expect(card.page.url).toContain('/short')
+    expect(await size(await readFile(file))).toEqual({ width: 1200, height: 630, format: 'jpeg' })
+  })
+
+  it('refuses what it cannot do before opening anything', async () => {
+    await expect(shareCard({ browser })).rejects.toThrow(/url/)
+    await expect(shareCard({ browser, url: server.url, output: join(out, 'card.gif') })).rejects.toThrow(/image format/)
+    await expect(shareCard({ browser, url: server.url, css: 1 })).rejects.toThrow(/stylesheet/)
   })
 })
